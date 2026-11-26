@@ -142,6 +142,7 @@ dialog::backdrop{background:#0b132b88}
   <label class="mydept">내 학과 <select id="myDept"></select></label>
   <input type="file" id="fRooms" accept=".xlsx,.xls,.csv" hidden>
   <span id="syncSt" class="refb" style="display:none"></span>
+  <button id="btnSaveNow" class="pri" title="지금 바로 저장 (Ctrl+S) · 평소에는 자동 저장됩니다">저장</button>
   <button id="btnSaveWork">작업파일 저장</button>
   <button id="btnLoadWork">작업파일 불러오기·합치기</button>
   <input type="file" id="fLedger" accept=".xlsx,.xls,.csv" hidden>
@@ -206,7 +207,7 @@ dialog::backdrop{background:#0b132b88}
   <b id="bulkN"></b>
   <span id="bWarn" style="display:none;background:#ffb84d;color:#3a2600;border-radius:8px;padding:4px 10px;font-size:13px;font-weight:700;cursor:pointer" title="눌러서 자세히 보기">⚠ 취득일이 다른 물품이 섞여 있음</span>
   <select id="bChk"><option value="">실사 여부…</option><option value="확인">실물 있음</option><option value="실물없음">실물 없음</option><option value="-">(지우기)</option></select>
-  <input id="bPlace" placeholder="실물 위치 (실물 있음 시)" style="min-height:36px;padding:4px 10px;width:190px;color:var(--ink)">
+  <input id="bPlace" placeholder="실물 위치 (설치장소 자동 입력)" title="고른 물품의 설치장소가 자동으로 들어갑니다. 실제 위치가 다르면 고쳐 쓰세요." style="min-height:36px;padding:4px 10px;width:230px;color:var(--ink)">
   <select id="bReason"><option value="">불용사유…</option></select>
   <button id="bPhoto" style="background:#4a7dff;border-color:#4a7dff">대표 사진 1장 넣기</button>
   <button id="bApply">적용</button>
@@ -342,7 +343,13 @@ let db=null;
 function openDB(){return new Promise(r=>{try{const q=indexedDB.open('bulyong',1);q.onupgradeneeded=()=>{q.result.createObjectStore('kv');q.result.createObjectStore('ph')};q.onsuccess=()=>{db=q.result;r()};q.onerror=()=>r()}catch(e){r()}})}
 function tx(store,mode,fn){return new Promise((res,rej)=>{if(!db)return res();const t=db.transaction(store,mode);const out=fn(t.objectStore(store));t.oncomplete=()=>res(out&&out.result);t.onerror=()=>rej(t.error)})}
 let saveT;
-function save(){clearTimeout(saveT);if(ON){syncSt('저장 중…');saveT=setTimeout(pushOnline,600);return}saveT=setTimeout(()=>tx('kv','readwrite',s=>{s.put(items,'items');s.put(settings,'settings')}).catch(e=>toast('저장 실패: '+e)),300)}
+function save(){clearTimeout(saveT);if(ON){syncSt('저장 중…');saveT=setTimeout(pushOnline,600);return}syncSt('저장 중…');saveT=setTimeout(()=>tx('kv','readwrite',s=>{s.put(items,'items');s.put(settings,'settings')}).then(()=>syncSt('자동 저장됨 ✓')).catch(e=>{syncSt('저장 실패',1);toast('저장 실패: '+e)}),300)}
+let curCommit=null;
+async function flushSave(){const b=$('#btnSaveNow');if(b.disabled)return;if(curCommit)curCommit();clearTimeout(saveT);b.disabled=true;b.textContent='저장 중…';
+  try{if(ON){while(saving)await new Promise(r=>setTimeout(r,200));await pushOnline();const left=items.filter(i=>JSON.stringify(recOf(i))!==synced.get(i.id)).length;if(left)throw new Error(`${left}건이 저장되지 않았습니다. 인터넷 연결을 확인하세요.`);syncSt('저장됨 ✓')}
+    else{if(!db)throw new Error('이 브라우저는 저장소를 쓸 수 없습니다. 작업파일 저장을 이용하세요.');await tx('kv','readwrite',s=>{s.put(items,'items');s.put(settings,'settings')});syncSt('저장됨 ✓')}
+    toast('저장했습니다 ✓',2000)}catch(e){syncSt('저장 실패',1);toast('저장 실패: '+e.message,6000)}
+  b.disabled=false;b.textContent='저장'}
 const putPh=(id,d)=>tx('ph','readwrite',s=>s.put(d,id));
 const delPh=id=>tx('ph','readwrite',s=>s.delete(id));
 async function load(){
@@ -505,7 +512,7 @@ function renderList(){
     ||'<tr><td colspan="11" class="empty">조건에 맞는 기자재가 없습니다.</td></tr>';
   $('#btnMore').hidden=L.length<=shown;$('#btnMore').textContent=`더 보기 (${(L.length-shown).toLocaleString()}건 남음)`;
   $('#selAll').checked=L.length>0&&L.every(i=>sel.has(i.id));
-  $('#bulkN').textContent=`${sel.size}건 선택`;$('#bulk').classList.toggle('on',sel.size>0);checkMix();
+  $('#bulkN').textContent=`${sel.size}건 선택`;$('#bulk').classList.toggle('on',sel.size>0);checkMix();fillPlace();
 }
 ['#fDept','#fRoom','#fLife','#fChk','#fOp','#fPh'].forEach(s=>$(s).onchange=()=>{if(s==='#fDept')fillRooms();shown=PAGE;renderList()});
 $('#fQ').oninput=()=>{shown=PAGE;renderList()};
@@ -517,11 +524,11 @@ $('#list tbody').onclick=e=>{const tr=e.target.closest('tr[data-id]');if(!tr)ret
 
 /* ================= 일괄 처리 ================= */
 $('#bReason').innerHTML='<option value="">불용사유…</option>'+REASONS.map(r=>`<option>${r}</option>`).join('');
-$('#bApply').onclick=()=>{const v={chk:$('#bChk').value,reason:$('#bReason').value};const pl=$('#bPlace').value.trim();if(pl&&!v.chk)v.chk='확인';
-  if(!Object.values(v).some(Boolean)&&!pl)return toast('적용할 항목을 하나 이상 고르세요.');
+$('#bApply').onclick=()=>{const v={chk:$('#bChk').value,reason:$('#bReason').value};const bp=$('#bPlace');const edited=bp.dataset.edited==='1';const pl=edited?bp.value.trim():'';if(pl&&!v.chk)v.chk='확인';
+  if(!Object.values(v).some(Boolean)&&!pl)v.chk='확인';
   const now=Date.now();for(const i of items)if(sel.has(i.id)){for(const k in v)if(v[k])i[k]=v[k]==='-'?'':v[k];if(v.reason&&v.reason!=='-')i.op='불용';i.upd=now}
-  for(const i of items)if(sel.has(i.id)){if(i.chk==='확인'&&pl)i.place=pl;if(i.chk!=='확인')i.place=''}
-  ['#bChk','#bReason','#bPlace'].forEach(s=>$(s).value='');save();toast(`${sel.size}건에 적용했습니다.`);renderList()};
+  for(const i of items)if(sel.has(i.id)){if(i.chk==='확인'){if(pl)i.place=pl;else if(!i.place)i.place=instOf(i)}else i.place=''}
+  ['#bChk','#bReason'].forEach(s=>$(s).value='');placeSig='';save();toast(`${sel.size}건에 적용했습니다.`);renderList()};
 function resetItem(i){Object.assign(i,{chk:'',cond:'',op:'',reason:'',memo:'',photos:[],disp:'',quote:0,place:'',upd:Date.now()})}
 function askReset(msg,fn){const d=$('#dlg');const wasOpen=d.open,prev=wasOpen?d.innerHTML:null;
   const box=document.createElement('dialog');box.innerHTML=`<div class="dlg-h"><h3>입력 내용을 초기화할까요?</h3></div><div class="dlg-b">${msg}<br><br>실사 여부, 실물 위치, 불용 신청, 불용사유, 비고, 수리비 견적, 사진이 지워지고 처음 상태로 돌아갑니다. 되돌릴 수 없습니다.</div><div class="dlg-f"><button id="xN">취소</button><button class="red" id="xY">초기화</button></div>`;
@@ -529,7 +536,11 @@ function askReset(msg,fn){const d=$('#dlg');const wasOpen=d.open,prev=wasOpen?d.
 $('#bReset').onclick=()=>{const L=items.filter(i=>sel.has(i.id));if(!L.length)return;
   askReset(`선택한 <b>${L.length}건</b>의 입력 내용을 지웁니다.`,()=>{L.forEach(resetItem);gcPhotos();save();toast(`${L.length}건을 초기화했습니다.`);renderList()})};
 /* 같은 품명·다른 취득일 선택 경고 */
-let lastMix='',mixHold=false;
+let lastMix='',mixHold=false,placeSig='';
+function fillPlace(){const bp=$('#bPlace');const sig=[...sel].sort().join(',');if(sig===placeSig)return;placeSig=sig;
+  const L=items.filter(i=>sel.has(i.id));const P=[...new Set(L.map(i=>i.place||instOf(i)))];
+  bp.dataset.edited='';bp.value=P.length===1?P[0]:'';bp.placeholder=P.length>1?`설치장소 ${P.length}곳 · 각자 설치장소로 입력`:'실물 위치 (설치장소 자동 입력)'}
+$('#bPlace').addEventListener('input',e=>{e.target.dataset.edited='1'});
 const josa=(w,a,b)=>{const c=String(w).trim().slice(-1).charCodeAt(0);return w+((c>=0xAC00&&c<=0xD7A3&&(c-0xAC00)%28)?a:b)};
 function askSame(it){const sib=items.filter(x=>x.id!==it.id&&pgKey(x)===pgKey(it));const un=sib.filter(x=>!sel.has(x.id));if(!un.length)return false;
   mixHold=true;renderList();const all=[it,...sib];
@@ -556,7 +567,7 @@ function checkMix(){const M=sel.size?mixInfo():[];const w=$('#bWarn');w.style.di
 $('#bClear').onclick=()=>{sel.clear();renderList()};
 /* 대표 사진: 취득일·단가가 같은 묶음마다 1장 */
 function pgKey(i){return [i.dept,i.room,i.opDept,instOf(i),i.g2b,i.name,i.spec,i.g2bName,i.acq,i.price].join('|')}
-function setRep(list,id){const now=Date.now();for(const i of list){i.photos=[id,...i.photos.filter(p=>p!==id)].slice(0,MAXPH);if(!i.op){i.op='불용';if(!i.reason&&isExp(i))i.reason=REASONS[0]}if(!i.chk)i.chk='확인';i.upd=now}save()}
+function setRep(list,id){const now=Date.now();for(const i of list){i.photos=[id,...i.photos.filter(p=>p!==id)].slice(0,MAXPH);if(!i.op){i.op='불용';if(!i.reason&&isExp(i))i.reason=REASONS[0]}if(!i.chk)i.chk='확인';if(i.chk==='확인'&&!i.place)i.place=instOf(i);i.upd=now}save()}
 let bulkTarget=[];
 $('#bPhoto').onclick=()=>{const S=items.filter(i=>sel.has(i.id));if(!S.length)return;
   const G=groupBy(S,pgKey);if(G.length===1){bulkTarget=S;$('#fBulkPh').click();return}
@@ -597,7 +608,7 @@ function openItem(id){
     </div>
     <div class="form">
       <label class="full">실사 여부${seg('chk',[['확인','실물 있음'],['실물없음','실물 없음']])}</label>
-      <div class="full" id="dPlaceWrap" style="grid-column:1/-1;${i.chk==='확인'?'':'display:none'}"><label>실물 위치 <span class="sub">지금 물품이 실제로 있는 곳을 적어 주세요</span><div style="display:flex;gap:8px"><input id="dPlace" style="flex:1" value="${esc(i.place||'')}" placeholder="예: 3층 예약발권실습실 뒤편, 5층 창고"><button type="button" id="dPlaceSame">설치장소와 같음</button></div></label></div>
+      <div class="full" id="dPlaceWrap" style="grid-column:1/-1;${i.chk==='확인'?'':'display:none'}"><label>실물 위치 <span class="sub">지금 물품이 실제로 있는 곳을 적어 주세요</span><div style="display:flex;gap:8px"><input id="dPlace" style="flex:1" value="${esc(i.place||(i.chk==='확인'?instOf(i):''))}" placeholder="예: 3층 예약발권실습실 뒤편, 5층 창고"><button type="button" id="dPlaceSame">설치장소와 같음</button></div></label></div>
       <label>불용사유<select id="dReason"><option value="">선택</option>${REASONS.map(r=>`<option ${i.reason===r?'selected':''}>${r}</option>`).join('')}</select></label>
       <label>수리비 견적(원) <span class="sub">내용연수 전 고장 시 입력</span><input id="dQuote" type="number" inputmode="numeric" min="0" step="1000" value="${i.quote||''}" placeholder="예: 430000"></label>
       <div id="dLimit" class="sub" style="align-self:end;padding-bottom:8px"></div>
@@ -614,7 +625,7 @@ function openItem(id){
     $('#dPh').querySelectorAll('.ph button').forEach(b=>b.onclick=e=>{e.preventDefault();i.photos.splice(+b.dataset.k,1);i.upd=Date.now();save();gcPhotos();drawPh()});
     const inp=$('#dPh input');if(inp)inp.onchange=async e=>{const fs=[...e.target.files].slice(0,MAXPH-i.photos.length);for(const f of fs){try{i.photos.push(await addPhoto(f))}catch(err){toast(String(err))}}
       if(i.photos.length&&!i.op){i.op='불용';if(!i.reason&&isExp(i)){i.reason=REASONS[0];$('#dReason').value=i.reason}d.querySelectorAll('[data-k=op] button').forEach(x=>x.classList.toggle('on',x.dataset.v==='불용'))}
-      if(!i.chk){i.chk='확인';d.querySelectorAll('[data-k=chk] button').forEach(x=>x.classList.toggle('on',x.dataset.v==='확인'));$('#dPlaceWrap').style.display=''}
+      if(!i.chk){i.chk='확인';d.querySelectorAll('[data-k=chk] button').forEach(x=>x.classList.toggle('on',x.dataset.v==='확인'));$('#dPlaceWrap').style.display='';if(!$('#dPlace').value.trim())$('#dPlace').value=instOf(i)}
       i.upd=Date.now();save();drawPh()}};
   const showLim=()=>{const q=+$('#dQuote').value||0;const lim=repairLimit(i);$('#dLimit').innerHTML=`경제적 수리한계 <b>${won(lim)}원</b> (사용 ${used(i).toFixed(2)}년 기준)`+(q?(q>lim?' → <span class="tag exp">수리비 초과</span>':' → <span class="tag ok">수리 가능 범위</span>'):'')};
   $('#dQuote').oninput=showLim;showLim();
@@ -622,14 +633,14 @@ function openItem(id){
   d.querySelectorAll('.seg').forEach(s=>s.onclick=e=>{const b=e.target.closest('button');if(!b)return;const k=s.dataset.k;i[k]=i[k]===b.dataset.v?'':b.dataset.v;
     if(k==='op'&&i.op==='불용'&&!i.reason){i.reason=isExp(i)?REASONS[0]:'';$('#dReason').value=i.reason}
     if(k==='cond'&&i.cond&&!i.chk){i.chk='확인';d.querySelector('[data-k=chk] [data-v="확인"]').classList.add('on')}
-    $('#dPlaceWrap').style.display=i.chk==='확인'?'':'none';if(i.chk==='확인'&&(k==='chk'||k==='cond'))setTimeout(()=>$('#dPlace').focus(),0);
+    $('#dPlaceWrap').style.display=i.chk==='확인'?'':'none';if(i.chk==='확인'&&!$('#dPlace').value.trim())$('#dPlace').value=instOf(i);if(i.chk==='확인'&&(k==='chk'||k==='cond'))setTimeout(()=>{$('#dPlace').focus();$('#dPlace').select()},0);
     s.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.v===i[k]));i.upd=Date.now()});
   $('#dReset').onclick=()=>askReset(`<b>${esc(i.name)}</b> (${esc(i.mgmt)})의 입력 내용을 지웁니다.`,()=>{resetItem(i);gcPhotos();save();toast('초기화했습니다.');openItem(i.id)});
-  $('#dPlaceSame').onclick=()=>{$('#dPlace').value=i.room+(i.loc?` (${i.loc})`:'')};
+  $('#dPlaceSame').onclick=()=>{$('#dPlace').value=instOf(i)};
   const commit=()=>{i.place=i.chk==='확인'?$('#dPlace').value.trim():'';i.reason=$('#dReason').value;i.memo=$('#dMemo').value.trim();i.quote=Math.max(0,Math.round(+$('#dQuote').value||0));i.op=(i.reason||i.photos.length)?'불용':(i.op==='불용'?'':i.op);i.upd=Date.now();save()};
   $('#dX').onclick=()=>{commit();d.close()};$('#dClose').onclick=()=>{commit();d.close()};
   $('#dPrev').onclick=()=>{commit();openItem(L[idx-1].id)};$('#dNext').onclick=()=>{commit();openItem(L[idx+1].id)};
-  d.onclose=()=>{commit();cur=null;renderList()};
+  curCommit=commit;d.onclose=()=>{commit();curCommit=null;cur=null;renderList()};
   if(!d.open)d.showModal();
 }
 
@@ -832,8 +843,8 @@ function renderGuide(){const E=window.EMBED;$('#tab-guide').innerHTML=`<div clas
 <li><b>불용 신청할 물품 고르고 사진 넣기</b> — 기본으로 <b>내용연수가 지난(대장에서 연핑크로 표시된) 기자재</b>만 보입니다. 실습실을 고르고 불용 신청할 물품을 체크한 뒤 아래 막대의 <b>대표 사진 1장 넣기</b>를 누르세요. 사진을 넣은 물품은 자동으로 불용 신청 대상이 됩니다. 같은 물품 여러 대(예: 학생용 PC 24대)는 모두 체크한 채로 한꺼번에 찍은 사진 1장만 올리면 됩니다. <b>취득일이 다른 물품이 섞여 있으면</b> 취득일별 묶음이 나오니 묶음마다 사진을 1장씩 넣어 주세요. 엑셀에도 취득일별로 한 줄, 사진 1장씩 들어갑니다.</li>
 <li><b>필요하면 고치기</b> — 물품 줄을 누르면 불용사유, 비고, 개별 사진을 고칠 수 있습니다. 내용연수 전 고장 물품은 필터를 '미경과'로 바꿔 찾고 수리비 견적을 적으면 경제적 수리한계가 계산됩니다.</li>
 <li><b>결과 엑셀 만들기</b> — 「결과 엑셀·출력」 탭에서 담당자 이름을 적고 <b>불용결정조서 엑셀 만들기</b>를 누릅니다. 조서의 '사진 보기'를 누르면 사진 탭의 해당 사진으로, 사진 탭의 연번을 누르면 조서의 해당 행으로 이동합니다.</li>
-${ON?'<li><b>자동 저장</b> — 입력한 내용과 사진은 바로 학교 서버에 저장되어 총괄 선생님 화면에도 모입니다. 위쪽에 「저장됨 ✓」이 보이면 저장된 것입니다.</li>':'<li><b>총괄 선생님께 보내기</b> — 결과 엑셀과 함께 \'작업파일 저장\'으로 만든 파일을 보내 주시면 총괄에서 4개 학과를 하나로 합칠 수 있습니다.</li>'}</ol>
-${ON?'<p class="help">여러 선생님이 동시에 써도 됩니다. 다른 선생님이 입력한 내용은 30초마다 자동으로 반영됩니다.</p></div>':'<p class="help">입력 내용과 사진은 이 컴퓨터의 브라우저 안에만 저장됩니다. 브라우저 기록을 지우면 사라지므로 작업이 끝날 때마다 \'작업파일 저장\'으로 백업해 두세요.</p></div>'}
+${ON?'<li><b>자동 저장</b> — 입력한 내용과 사진은 바로 학교 서버에 저장되어 총괄 선생님 화면에도 모입니다. 위쪽에 「저장됨 ✓」이 보이면 저장된 것입니다. 바로 저장하고 싶을 때는 위쪽 <b>저장</b> 버튼(또는 Ctrl+S)을 누르세요.</li>':'<li><b>총괄 선생님께 보내기</b> — 결과 엑셀과 함께 \'작업파일 저장\'으로 만든 파일을 보내 주시면 총괄에서 4개 학과를 하나로 합칠 수 있습니다.</li>'}</ol>
+${ON?'<p class="help">여러 선생님이 동시에 써도 됩니다. 다른 선생님이 입력한 내용은 30초마다 자동으로 반영됩니다.</p></div>':'<p class="help">입력 내용과 사진은 이 컴퓨터의 브라우저 안에만 저장됩니다. 브라우저 기록을 지우면 사라지므로 입력하면 자동 저장되고, 위쪽 <b>저장</b> 버튼(또는 Ctrl+S)을 누르면 즉시 저장됩니다. 작업이 끝날 때마다 \'작업파일 저장\'으로 백업해 두세요.</p></div>'}
 ${ON?'':`<div class="card"><h2>관리자용</h2><p class="help" style="margin:0 0 10px">앱에 들어 있는 대장: ${esc(E?E.ver:'없음')} · 기자재 ${items.length.toLocaleString()}건 · 사진 ${photos.size.toLocaleString()}장${settings.dataVer==='custom'?' · <b>지금은 직접 불러온 대장을 쓰는 중</b>':''}</p>
 <div class="docbtns"><button id="gLedger">다른 기자재대장 불러오기</button><button id="gRooms">실습실 현황 불러오기</button>${E?'<button id="gEmbed">앱 내장 대장으로 되돌리기</button>':''}<button class="red" id="btnReset">모든 입력 지우기</button></div></div>`}`;
   if(ON)return;
@@ -843,6 +854,8 @@ ${ON?'':`<div class="card"><h2>관리자용</h2><p class="help" style="margin:0 
     d.onclose=null;d.showModal();$('#rN').onclick=()=>d.close();$('#rY').onclick=async()=>{items=[];photos.clear();await tx('ph','readwrite',s=>s.clear());settings.dataVer='';applyEmbed(true);save();d.close();sel.clear();fillFilters();fillMyDept();render();toast('삭제했습니다.')}}}
 
 /* ================= 시작 ================= */
+$('#btnSaveNow').onclick=flushSave;
+document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();flushSave()}});
 $('#fLedger').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)importLedger(f).catch(err=>toast('불러오기 실패: '+err.message,6000))};
 $('#fRooms').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)importRooms(f).catch(err=>toast('불러오기 실패: '+err.message,6000))};
 $('#myDept').onchange=e=>{settings.myDept=e.target.value;save();fillMyDept();applyMyDept();if(settings.myDept&&tab==='dash'){tab='list';document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x.dataset.tab==='list'))}render()};
