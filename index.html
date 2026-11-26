@@ -173,11 +173,9 @@ dialog::backdrop{background:#0b132b88}
           <option value="실물없음">실물 없음</option>
         </select>
         <select id="fOp">
-          <option value="">처리의견: 전체</option>
-          <option value="none">의견 미입력</option>
-          <option value="불용">불용</option>
-          <option value="계속사용">계속 사용</option>
-          <option value="수리후사용">수리 후 사용</option>
+          <option value="">불용 신청: 전체</option>
+          <option value="불용">불용 신청함</option>
+          <option value="none">아직 안 함</option>
         </select>
         <select id="fPh">
           <option value="">사진: 전체</option>
@@ -192,7 +190,7 @@ dialog::backdrop{background:#0b132b88}
           <thead><tr>
             <th class="cb"><input type="checkbox" id="selAll" title="표시된 항목 전체 선택"></th>
             <th>실습실</th><th>품명 / 규격</th><th class="hide-m">관리번호</th><th class="hide-m">취득일</th>
-            <th class="n hide-m">취득금액</th><th>내용연수</th><th>실사 여부</th><th>처리의견</th><th class="n">사진</th><th>비고</th>
+            <th class="n hide-m">취득금액</th><th>내용연수</th><th>실사 여부</th><th>불용 신청</th><th class="n">사진</th><th>비고</th>
           </tr></thead>
           <tbody></tbody>
         </table>
@@ -209,7 +207,6 @@ dialog::backdrop{background:#0b132b88}
   <span id="bWarn" style="display:none;background:#ffb84d;color:#3a2600;border-radius:8px;padding:4px 10px;font-size:13px;font-weight:700;cursor:pointer" title="눌러서 자세히 보기">⚠ 취득일이 다른 물품이 섞여 있음</span>
   <select id="bChk"><option value="">실사 여부…</option><option value="확인">실물 있음</option><option value="실물없음">실물 없음</option><option value="-">(지우기)</option></select>
   <input id="bPlace" placeholder="실물 위치 (실물 있음 시)" style="min-height:36px;padding:4px 10px;width:190px;color:var(--ink)">
-  <select id="bOp"><option value="">처리의견…</option><option>불용</option><option>계속사용</option><option>수리후사용</option><option value="-">(지우기)</option></select>
   <select id="bReason"><option value="">불용사유…</option></select>
   <button id="bPhoto" style="background:#4a7dff;border-color:#4a7dff">대표 사진 1장 넣기</button>
   <button id="bApply">적용</button>
@@ -458,14 +455,14 @@ function renderDash(){
   const row=(k,a,link)=>`<tr><td>${link?`<a href="#" data-dept="${esc(k)}">${esc(k)}</a>`:esc(k)}</td><td class="n">${won(a.n)}</td><td class="n">${won(a.exp)}</td><td class="n">${ok(a.expAmt)}</td>
     <td><div style="display:flex;gap:8px;align-items:center"><div class="bar" style="flex:1"><i style="width:${pct(a.expDone,a.exp)}%"></i></div><span class="sub" style="white-space:nowrap">${a.expDone}/${a.exp}</span></div></td>
     <td class="n">${won(a.bul)}</td><td class="n">${ok(a.bulAmt)}</td><td class="n">${a.bul?`${a.ph}/${a.bul}`:'-'}</td><td class="n">${a.miss||'-'}</td></tr>`;
-  const head=`<thead><tr><th>구분</th><th class="n">보유</th><th class="n">연수 경과</th><th class="n">경과 금액</th><th>경과 물품 의견 입력</th><th class="n">불용 결정</th><th class="n">불용 금액</th><th class="n">사진 등록</th><th class="n">실물 없음</th></tr></thead>`;
+  const head=`<thead><tr><th>구분</th><th class="n">보유</th><th class="n">연수 경과</th><th class="n">경과 금액</th><th>경과 물품 중 불용 신청</th><th class="n">불용 신청</th><th class="n">불용 금액</th><th class="n">사진 등록</th><th class="n">실물 없음</th></tr></thead>`;
   const depts=groupBy(items,i=>i.dept);
   $('#tab-dash').innerHTML=`
   <div class="kpis">
     <div class="kpi"><small>보유 기자재</small><div>${won(A.n)}건</div><em>취득금액 ${ok(A.amt)}원 · ${depts.length}개 학과</em></div>
     <div class="kpi"><small>내용연수 경과 (${esc(settings.ref)} 기준)</small><div style="color:var(--red)">${won(A.exp)}건</div><em>${pct(A.exp,A.n)}% · ${ok(A.expAmt)}원</em></div>
-    <div class="kpi"><small>경과 물품 처리의견 입력</small><div>${pct(A.expDone,A.exp)}%</div><em>${won(A.expDone)} / ${won(A.exp)}건</em></div>
-    <div class="kpi"><small>불용 대상 확정</small><div style="color:var(--pri)">${won(A.bul)}건</div><em>${ok(A.bulAmt)}원 · 사진 ${A.ph}/${A.bul}</em></div>
+    <div class="kpi"><small>경과 물품 중 불용 신청</small><div>${pct(A.expDone,A.exp)}%</div><em>${won(A.expDone)} / ${won(A.exp)}건</em></div>
+    <div class="kpi"><small>불용 신청</small><div style="color:var(--pri)">${won(A.bul)}건</div><em>${ok(A.bulAmt)}원 · 사진 ${A.ph}/${A.bul}</em></div>
   </div>
   <div class="card"><h2>학과별 현황</h2><div class="scroll"><table>${head}<tbody>${depts.map(([k,l])=>row(k,agg(l),1)).join('')}<tr style="font-weight:700">${row('합계',A).slice(4)}</tbody></table></div></div>
   ${depts.map(([d,l])=>`<div class="card"><h2>${esc(d)} · 실습실별</h2><div class="scroll"><table>${head}<tbody>${groupBy(l,i=>i.room).map(([k,ll])=>row(k,agg(ll))).join('')}</tbody></table></div></div>`).join('')}`;
@@ -492,7 +489,7 @@ function filtered(){
 function lifeTag(i){const e=isExp(i);return `<span class="tag ${e?'exp':isSoon(i)?'warn':''}">${e?'경과':isSoon(i)?'임박':'미경과'}</span><div class="sub">${lifeOf(i)}년 · ${used(i).toFixed(1)}년 사용</div>`}
 const chkTag=i=>i.chk?`<span class="tag ${i.chk==='확인'?'ok':'exp'}">${i.chk==='확인'?'실물 있음':'실물 없음'}</span>${i.chk==='확인'&&i.place?`<div class="sub">${esc(i.place)}</div>`:''}`:'<span class="sub">-</span>';
 const condTag=i=>i.cond?`<span class="tag ${i.cond==='고장'||i.cond==='불량'?'warn':''}">${esc(i.cond)}</span>`:'<span class="sub">-</span>';
-const opTag=i=>i.op?`<span class="tag ${i.op==='불용'?'pri':''}">${esc(i.op)}</span>${i.op==='불용'&&i.reason?`<div class="sub">${esc(i.reason)}</div>`:''}`:'<span class="sub">-</span>';
+const opTag=i=>i.op==='불용'?`<span class="tag pri">신청</span>${i.reason?`<div class="sub">${esc(i.reason)}</div>`:''}`:'<span class="sub">-</span>';
 function renderList(){
   if(!items.length){$('#tab-list').querySelector('.card').style.display='none';if(!$('#listEmpty'))$('#tab-list').insertAdjacentHTML('afterbegin',`<div id="listEmpty">${emptyHTML}</div>`);return}
   $('#listEmpty')?.remove();$('#tab-list').querySelector('.card').style.display='';
@@ -520,14 +517,14 @@ $('#list tbody').onclick=e=>{const tr=e.target.closest('tr[data-id]');if(!tr)ret
 
 /* ================= 일괄 처리 ================= */
 $('#bReason').innerHTML='<option value="">불용사유…</option>'+REASONS.map(r=>`<option>${r}</option>`).join('');
-$('#bApply').onclick=()=>{const v={chk:$('#bChk').value,op:$('#bOp').value,reason:$('#bReason').value};const pl=$('#bPlace').value.trim();if(pl&&!v.chk)v.chk='확인';
+$('#bApply').onclick=()=>{const v={chk:$('#bChk').value,reason:$('#bReason').value};const pl=$('#bPlace').value.trim();if(pl&&!v.chk)v.chk='확인';
   if(!Object.values(v).some(Boolean)&&!pl)return toast('적용할 항목을 하나 이상 고르세요.');
-  const now=Date.now();for(const i of items)if(sel.has(i.id)){for(const k in v)if(v[k])i[k]=v[k]==='-'?'':v[k];if(v.reason&&!v.op&&!i.op)i.op='불용';if(v.op&&v.op!=='불용')i.reason='';i.upd=now}
+  const now=Date.now();for(const i of items)if(sel.has(i.id)){for(const k in v)if(v[k])i[k]=v[k]==='-'?'':v[k];if(v.reason&&v.reason!=='-')i.op='불용';i.upd=now}
   for(const i of items)if(sel.has(i.id)){if(i.chk==='확인'&&pl)i.place=pl;if(i.chk!=='확인')i.place=''}
-  ['#bChk','#bOp','#bReason','#bPlace'].forEach(s=>$(s).value='');save();toast(`${sel.size}건에 적용했습니다.`);renderList()};
+  ['#bChk','#bReason','#bPlace'].forEach(s=>$(s).value='');save();toast(`${sel.size}건에 적용했습니다.`);renderList()};
 function resetItem(i){Object.assign(i,{chk:'',cond:'',op:'',reason:'',memo:'',photos:[],disp:'',quote:0,place:'',upd:Date.now()})}
 function askReset(msg,fn){const d=$('#dlg');const wasOpen=d.open,prev=wasOpen?d.innerHTML:null;
-  const box=document.createElement('dialog');box.innerHTML=`<div class="dlg-h"><h3>입력 내용을 초기화할까요?</h3></div><div class="dlg-b">${msg}<br><br>실사 여부, 실물 위치, 처리의견, 불용사유, 비고, 수리비 견적, 사진이 지워지고 처음 상태로 돌아갑니다. 되돌릴 수 없습니다.</div><div class="dlg-f"><button id="xN">취소</button><button class="red" id="xY">초기화</button></div>`;
+  const box=document.createElement('dialog');box.innerHTML=`<div class="dlg-h"><h3>입력 내용을 초기화할까요?</h3></div><div class="dlg-b">${msg}<br><br>실사 여부, 실물 위치, 불용 신청, 불용사유, 비고, 수리비 견적, 사진이 지워지고 처음 상태로 돌아갑니다. 되돌릴 수 없습니다.</div><div class="dlg-f"><button id="xN">취소</button><button class="red" id="xY">초기화</button></div>`;
   document.body.appendChild(box);box.showModal();box.querySelector('#xN').onclick=()=>box.close();box.querySelector('#xY').onclick=()=>{box.close();fn()};box.onclose=()=>box.remove()}
 $('#bReset').onclick=()=>{const L=items.filter(i=>sel.has(i.id));if(!L.length)return;
   askReset(`선택한 <b>${L.length}건</b>의 입력 내용을 지웁니다.`,()=>{L.forEach(resetItem);gcPhotos();save();toast(`${L.length}건을 초기화했습니다.`);renderList()})};
@@ -600,7 +597,6 @@ function openItem(id){
     <div class="form">
       <label class="full">실사 여부${seg('chk',[['확인','실물 있음'],['실물없음','실물 없음']])}</label>
       <div class="full" id="dPlaceWrap" style="grid-column:1/-1;${i.chk==='확인'?'':'display:none'}"><label>실물 위치 <span class="sub">지금 물품이 실제로 있는 곳을 적어 주세요</span><div style="display:flex;gap:8px"><input id="dPlace" style="flex:1" value="${esc(i.place||'')}" placeholder="예: 3층 예약발권실습실 뒤편, 5층 창고"><button type="button" id="dPlaceSame">설치장소와 같음</button></div></label></div>
-      <label class="full">처리의견${seg('op',['불용','계속사용','수리후사용'])}</label>
       <label>불용사유<select id="dReason"><option value="">선택</option>${REASONS.map(r=>`<option ${i.reason===r?'selected':''}>${r}</option>`).join('')}</select></label>
       <label>수리비 견적(원) <span class="sub">내용연수 전 고장 시 입력</span><input id="dQuote" type="number" inputmode="numeric" min="0" step="1000" value="${i.quote||''}" placeholder="예: 430000"></label>
       <div id="dLimit" class="sub" style="align-self:end;padding-bottom:8px"></div>
@@ -629,7 +625,7 @@ function openItem(id){
     s.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.v===i[k]));i.upd=Date.now()});
   $('#dReset').onclick=()=>askReset(`<b>${esc(i.name)}</b> (${esc(i.mgmt)})의 입력 내용을 지웁니다.`,()=>{resetItem(i);gcPhotos();save();toast('초기화했습니다.');openItem(i.id)});
   $('#dPlaceSame').onclick=()=>{$('#dPlace').value=i.room+(i.loc?` (${i.loc})`:'')};
-  const commit=()=>{i.place=i.chk==='확인'?$('#dPlace').value.trim():'';i.reason=$('#dReason').value;i.memo=$('#dMemo').value.trim();i.quote=Math.max(0,Math.round(+$('#dQuote').value||0));if(i.reason&&!i.op)i.op='불용';if(i.op&&i.op!=='불용')i.reason='';i.upd=Date.now();save()};
+  const commit=()=>{i.place=i.chk==='확인'?$('#dPlace').value.trim():'';i.reason=$('#dReason').value;i.memo=$('#dMemo').value.trim();i.quote=Math.max(0,Math.round(+$('#dQuote').value||0));i.op=(i.reason||i.photos.length)?'불용':(i.op==='불용'?'':i.op);i.upd=Date.now();save()};
   $('#dX').onclick=()=>{commit();d.close()};$('#dClose').onclick=()=>{commit();d.close()};
   $('#dPrev').onclick=()=>{commit();openItem(L[idx-1].id)};$('#dNext').onclick=()=>{commit();openItem(L[idx+1].id)};
   d.onclose=()=>{commit();cur=null;renderList()};
@@ -646,7 +642,7 @@ function renderOut(){
       <label>학교명<input id="oSchool" value="${esc(settings.school)}" placeholder="○○고등학교"></label>
       <label>작성자(부서)<input id="oWriter" value="${esc(settings.writer)}" placeholder="예: 정보부 / 홍길동"></label>
       <label>학과<select id="oDept"><option value="">전체 학과</option>${ds.map(d=>`<option>${esc(d)}</option>`).join('')}</select></label>
-      <label>대상<select id="oScope"><option value="bul">처리의견 '불용' 항목</option><option value="exp">내용연수 경과 전체</option><option value="expnb">경과했지만 '계속사용' 아닌 항목</option></select></label>
+      <label>대상<select id="oScope"><option value="bul">불용 신청한 물품</option><option value="exp">내용연수 경과 전체</option></select></label>
       <label class="chk"><input type="checkbox" id="oGroup" checked> 같은 품목 묶어서 표시 (실습실·품명·규격·취득일·단가 동일)</label>
       <label class="chk"><input type="checkbox" id="oSign" checked> 결재란 넣기</label>
     </div>
@@ -684,7 +680,7 @@ const title={list:'불용 대상 기자재 목록',photo:'불용 대상 기자�
 function docHead(doc){const d=$('#oDept').value;return `<h1>${title[doc]}</h1><div class="meta"><span>${esc(settings.school)}${d?' · '+esc(d):''}</span><span>기준일 ${esc(settings.ref)}${settings.writer?' · 작성 '+esc(settings.writer):''}</span></div>`}
 function signBox(){return $('#oSign').checked?`<div class="sign"><table><tr><th>담당</th><th>부장</th><th>교감</th><th>교장</th></tr><tr><td></td><td></td><td></td><td></td></tr></table></div>`:''}
 function buildDoc(doc){
-  const L=outItems();if(!L.length)return {html:`<div class="doc"><p style="text-align:center;padding:30mm 0">출력할 항목이 없습니다. 불용 대상 선택 탭에서 처리의견을 '불용'으로 입력하거나 대상을 바꿔 보세요.</p></div>`,n:0};
+  const L=outItems();if(!L.length)return {html:`<div class="doc"><p style="text-align:center;padding:30mm 0">출력할 항목이 없습니다. 불용 대상 선택 탭에서 물품을 골라 사진을 넣거나 대상을 바꿔 보세요.</p></div>`,n:0};
   const G=lots(L);
   if(doc==='list'){let no=0;const body=groupBy(G,g=>g.dept+'\u0000'+g.room).map(([k,gs])=>{const[d,r]=k.split('\u0000');const q=gs.reduce((s,g)=>s+g.qty,0),a=gs.reduce((s,g)=>s+g.amt,0);
       return gs.map(g=>`<tr><td class="c">${++no}</td><td>${esc(g.room)}</td><td>${esc(g.name)}</td><td>${esc(g.spec)}</td><td class="c">${esc(rangeTxt(g.list,'mgmt'))}</td><td class="c">${esc(g.acq)}</td><td class="c">${lifeOf(g)}년</td><td class="c">${used(g).toFixed(1)}년</td><td class="n">${g.qty}</td><td class="n">${won(g.price)}</td><td class="n">${won(g.amt)}</td><td>${esc(g.reason||'')}${g.memo?`<br><span style="font-size:7.5pt">${esc(g.memo)}</span>`:''}</td></tr>`).join('')
@@ -717,7 +713,7 @@ window.addEventListener('afterprint',()=>$('#print').innerHTML='');
 /* ================= 엑셀 내보내기 ================= */
 function exportXlsx(){if(typeof XLSX==='undefined')return toast('엑셀 모듈 없음');
   const L=outItems();if(!L.length)return toast('내보낼 항목이 없습니다.');
-  const rows=L.map((i,k)=>({연번:k+1,학과:i.dept,실습실:i.room,위치:i.loc||'','대장 기준학과':i.dept0||i.dept,물품분류명:clsOf(i),'운용부서(에듀파인)':i.opDept||'','설치장소(에듀파인)':i.inst||'','설치장소(조서 표기)':instOf(i),'부기자재 확인':subOf(i)?subNote(i):'','대장 실습실명':i.room0||i.room,교과군:i.group,품번:i.pnum,기자재명:i.name,규격:i.spec,기자재관리번호:i.mgmt,물품고유번호:i.id,취득일:i.acq,취득금액:i.price,'적용 내용연수':lifeOf(i),'내용연수 만료일':endOf(i),'사용연수':+used(i).toFixed(1),'연수 경과':isExp(i)?'경과':'미경과','실사 여부':i.chk==='확인'?'실물 있음':i.chk==='실물없음'?'실물 없음':'','실물 위치':i.place||'',처리의견:i.op,불용사유:i.reason,비고:i.memo,'수리비 견적':i.quote||'','경제적 수리한계':i.quote?repairLimit(i):'','사진 유무':i.photos.length?'있음':'없음',G2B목록번호:i.g2b,G2B목록명:i.g2bName}));
+  const rows=L.map((i,k)=>({연번:k+1,학과:i.dept,실습실:i.room,위치:i.loc||'','대장 기준학과':i.dept0||i.dept,물품분류명:clsOf(i),'운용부서(에듀파인)':i.opDept||'','설치장소(에듀파인)':i.inst||'','설치장소(조서 표기)':instOf(i),'부기자재 확인':subOf(i)?subNote(i):'','대장 실습실명':i.room0||i.room,교과군:i.group,품번:i.pnum,기자재명:i.name,규격:i.spec,기자재관리번호:i.mgmt,물품고유번호:i.id,취득일:i.acq,취득금액:i.price,'적용 내용연수':lifeOf(i),'내용연수 만료일':endOf(i),'사용연수':+used(i).toFixed(1),'연수 경과':isExp(i)?'경과':'미경과','실사 여부':i.chk==='확인'?'실물 있음':i.chk==='실물없음'?'실물 없음':'','실물 위치':i.place||'','불용 신청':i.op==='불용'?'신청':'',불용사유:i.reason,비고:i.memo,'수리비 견적':i.quote||'','경제적 수리한계':i.quote?repairLimit(i):'','사진 유무':i.photos.length?'있음':'없음',G2B목록번호:i.g2b,G2B목록명:i.g2bName}));
   const ws=XLSX.utils.json_to_sheet(rows);ws['!cols']=Object.keys(rows[0]).map(k=>({wch:Math.min(40,Math.max(8,k.length*2+2))}));
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'불용대상');
   download(`불용대상_${$('#oDept').value||'전체'}_${settings.ref}.xlsx`,new Blob([XLSX.write(wb,{bookType:'xlsx',type:'array'})],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}))}
@@ -740,7 +736,7 @@ function imgSize(src){return new Promise(r=>{const im=new Image();im.onload=()=>
 const ymd=s=>{const[y,m,d]=String(s).split('-').map(Number);return y?new Date(Date.UTC(y,m-1,d)):null};
 async function exportJoseo(){
   if(typeof ExcelJS==='undefined')return toast('엑셀(사진) 모듈을 불러오지 못했습니다.');
-  const L=outItems();if(!L.length)return toast('대상 항목이 없습니다. 처리의견을 불용으로 입력했는지 확인하세요.',5000);
+  const L=outItems();if(!L.length)return toast('불용 신청한 물품이 없습니다. 물품을 골라 대표 사진을 넣어 주세요.',5000);
   if(ON){$('#joseoMsg').textContent='사진 불러오는 중…';await ensurePh(L.flatMap(i=>i.photos))}
   const G=joseoGroups(L),dsel=$('#oDept').value,mg=settings.managers||{};
   const wb=new ExcelJS.Workbook();wb.creator='기자재 불용 정리';
