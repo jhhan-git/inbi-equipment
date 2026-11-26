@@ -536,10 +536,11 @@ function askSame(it){const sib=items.filter(x=>x.id!==it.id&&pgKey(x)===pgKey(it
   const box=document.createElement('dialog');
   box.innerHTML=`<div class="dlg-h"><div style="flex:1"><h3>취득일이 같은 동일한 ${esc(josa(it.name,'을','를'))} 모두 선택할까요?</h3><div class="sub">${esc(it.room)} · 규격 <b>${esc(it.spec||'-')}</b> · 취득 <b>${esc(it.acq)}</b> · 단가 ${won(it.price)}원</div><div class="sub">${esc(it.g2bName)}</div></div></div>
   <div class="dlg-b">같은 실습실에 품명·규격·취득일·단가가 모두 같은 물품이 모두 <b>${all.length}대</b> 있습니다. (아직 선택 안 된 것 ${un.length}대)<div class="sub" style="margin-top:6px">${esc(idRuns(all.map(x=>x.id)))}</div></div>
-  <div class="dlg-f"><button id="sqN">이것만 선택</button><button class="pri" id="sqY">${all.length}대 모두 선택</button></div>`;
+  <div class="dlg-f"><button id="sqC" style="margin-right:auto">취소</button><button id="sqN">이것만 선택</button><button class="pri" id="sqY">${all.length}대 모두 선택</button></div>`;
   document.body.appendChild(box);box.showModal();
   const done=()=>{box.close()};
   box.querySelector('#sqY').onclick=()=>{un.forEach(x=>sel.add(x.id));done()};box.querySelector('#sqN').onclick=done;
+  const cancel=()=>{sel.delete(it.id);done()};box.querySelector('#sqC').onclick=cancel;box.addEventListener('cancel',e=>{e.preventDefault();cancel()});
   box.onclose=()=>{box.remove();mixHold=false;renderList()};return true}
 function mixInfo(){const m=new Map();for(const i of items)if(sel.has(i.id)){const k=i.name;if(!m.has(k))m.set(k,new Map());const a=m.get(k);a.set(i.acq,(a.get(i.acq)||0)+1)}
   return [...m.entries()].filter(([,a])=>a.size>1).map(([n,a])=>({name:n,acqs:[...a.entries()].sort()}))}
