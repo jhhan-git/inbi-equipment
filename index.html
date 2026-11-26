@@ -207,7 +207,7 @@ dialog::backdrop{background:#0b132b88}
   <b id="bulkN"></b>
   <span id="bWarn" style="display:none;background:#ffb84d;color:#3a2600;border-radius:8px;padding:4px 10px;font-size:13px;font-weight:700;cursor:pointer" title="눌러서 자세히 보기">⚠ 취득일이 다른 물품이 섞여 있음</span>
   <select id="bChk"><option value="">실사 여부…</option><option value="확인">실물 있음</option><option value="실물없음">실물 없음</option><option value="-">(지우기)</option></select>
-  <input id="bPlace" placeholder="실물 위치 (설치장소 자동 입력)" title="고른 물품의 설치장소가 자동으로 들어갑니다. 실제 위치가 다르면 고쳐 쓰세요." style="min-height:36px;padding:4px 10px;width:230px;color:var(--ink)">
+  <input id="bPlace" placeholder="실물 위치 (설치장소 자동 입력)" title="고른 물품의 설치장소가 자동으로 들어갑니다. 실제 위치가 다르면 고쳐 쓰세요." style="min-height:36px;padding:4px 10px;width:230px;color:var(--ink)"><span style="font-size:12.5px;color:#c9d3e6;white-space:nowrap">(다를 시 직접 수정)</span>
   <select id="bReason"><option value="">불용사유…</option></select>
   <button id="bPhoto" style="background:#4a7dff;border-color:#4a7dff">대표 사진 1장 넣기</button>
   <button id="bApply">적용</button>
@@ -608,7 +608,7 @@ function openItem(id){
     </div>
     <div class="form">
       <label class="full">실사 여부${seg('chk',[['확인','실물 있음'],['실물없음','실물 없음']])}</label>
-      <div class="full" id="dPlaceWrap" style="grid-column:1/-1;${i.chk==='확인'?'':'display:none'}"><label>실물 위치 <span class="sub">지금 물품이 실제로 있는 곳을 적어 주세요</span><div style="display:flex;gap:8px"><input id="dPlace" style="flex:1" value="${esc(i.place||(i.chk==='확인'?instOf(i):''))}" placeholder="예: 3층 예약발권실습실 뒤편, 5층 창고"><button type="button" id="dPlaceSame">설치장소와 같음</button></div></label></div>
+      <div class="full" id="dPlaceWrap" style="grid-column:1/-1;${i.chk==='확인'?'':'display:none'}"><label>실물 위치 <span class="sub">설치장소가 자동으로 들어갑니다 (다를 시 직접 수정)</span><div style="display:flex;gap:8px"><input id="dPlace" style="flex:1" value="${esc(i.place||(i.chk==='확인'?instOf(i):''))}" placeholder="예: 3층 예약발권실습실 뒤편, 5층 창고"><button type="button" id="dPlaceSame">설치장소와 같음</button></div></label></div>
       <label>불용사유<select id="dReason"><option value="">선택</option>${REASONS.map(r=>`<option ${i.reason===r?'selected':''}>${r}</option>`).join('')}</select></label>
       <label>수리비 견적(원) <span class="sub">내용연수 전 고장 시 입력</span><input id="dQuote" type="number" inputmode="numeric" min="0" step="1000" value="${i.quote||''}" placeholder="예: 430000"></label>
       <div id="dLimit" class="sub" style="align-self:end;padding-bottom:8px"></div>
